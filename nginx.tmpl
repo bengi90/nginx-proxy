@@ -645,7 +645,20 @@ proxy_set_header Proxy "";
     {{- $vhost_data := get $globals.vhosts $hostname | default (dict) }}
     {{- $paths := $vhost_data.paths | default (dict) }}
 
-    {{- $tmp_paths := groupByWithDefault $containers "Env.VIRTUAL_PATH" "/" }}
+    # Multi path handling
+    {{- $tmp_paths := dict }}
+    {{- range $i, $container := $containers }}
+      {{- $vp := default "/" $container.Env.VIRTUAL_PATH }}
+      {{- $pathsList := split $vp "," }}
+      {{- range $j, $p := $pathsList }}
+        {{- $p = trim $p }}
+        {{- if not (hasKey $tmp_paths $p) }}
+          {{- $_ := set $tmp_paths $p (list $container) }}
+        {{- else }}
+          {{- $_ := set $tmp_paths $p (append (index $tmp_paths $p) $container) }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
 
     {{- range $path, $containers := $tmp_paths }}
         {{- $dest := groupByKeys $containers "Env.VIRTUAL_DEST" | first | default "" }}
